@@ -61,7 +61,7 @@ WordPress installs with.
 ```bash
 bash cmd-tools-bbpress-forums.sh myforums                    # the forums, their topics and replies, the forum role of each account
 bash cmd-tools-bbpress-forums.sh myforums --add-users        # the default accounts, each with its forum role
-bash cmd-tools-bbpress-forums.sh myforums --cancel-users     # delete them, and what they wrote
+bash cmd-tools-bbpress-forums.sh myforums --cancel-users     # delete them; what they wrote stays, without an author
 bash cmd-tools-bbpress-forums.sh myforums --sample-content   # the sample forums and topics; what is there is kept
 bash cmd-tools-bbpress-forums.sh myforums --tidy             # take away what a stopped test run left
 bash cmd-tools-wordpress-cli.sh myforums                     # WordPress, plugins, themes, accounts
@@ -87,8 +87,9 @@ stay right.
 | `blocked` | `blocked@example.com` | subscriber | Blocked: no forum at all |
 
 One password for all of them, the workspace's for its other default lists. They are for local sites
-and for tests; the workspace account is never written into a test. Deleting an account deletes the
-topics and replies it wrote: add the sample content again afterwards.
+and for tests; the workspace account is never written into a test. Deleting an account leaves the
+topics and replies it wrote, without an author: add the accounts, then the sample content again, and
+each sample topic and reply gets its author back.
 
 ## Look after the projects
 

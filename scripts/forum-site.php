@@ -118,6 +118,19 @@ function webship_find( $type, $title, $parent = null ) {
 	return $found ? (int) $found[0] : 0;
 }
 
+/**
+ * Give an item of the content its author back. Deleting an account leaves its topics and replies in place, without
+ * an author ("Anonymous"); when the account is there again under a new id, the content it wrote is its own again.
+ */
+function webship_own( $id, $author ) {
+	$user = get_user_by( 'login', $author );
+	$post = get_post( $id );
+	if ( $user && $post && (int) $post->post_author !== (int) $user->ID ) {
+		wp_update_post( array( 'ID' => $id, 'post_author' => (int) $user->ID ) );
+	}
+	return (int) $id;
+}
+
 /** The moment of the n-th item of the content: one minute apart, a week ago, so the order on every list is fixed. */
 function webship_date( $n ) {
 	return gmdate( 'Y-m-d H:i:s', strtotime( '2026-01-05 09:00:00 UTC' ) + 60 * $n );
@@ -140,7 +153,7 @@ function webship_forum( $title, $content, $parent = 0, $order = 0 ) {
 		);
 		echo "  forum: {$title}\n";
 	}
-	return (int) $id;
+	return webship_own( $id, 'keymaster' );
 }
 
 function webship_topic( $forum, $title, $content, $author, $n, $tags = array() ) {
@@ -161,7 +174,7 @@ function webship_topic( $forum, $title, $content, $author, $n, $tags = array() )
 			wp_set_object_terms( $id, $tags, bbp_get_topic_tag_tax_id() );
 		}
 	}
-	return (int) $id;
+	return webship_own( $id, $author );
 }
 
 function webship_reply( $forum, $topic, $content, $author, $n ) {
@@ -175,7 +188,7 @@ function webship_reply( $forum, $topic, $content, $author, $n ) {
 	);
 	foreach ( $existing as $reply ) {
 		if ( $reply->post_content === $content ) {
-			return (int) $reply->ID;
+			return webship_own( $reply->ID, $author );
 		}
 	}
 	return (int) bbp_insert_reply(

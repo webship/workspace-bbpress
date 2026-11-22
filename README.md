@@ -129,7 +129,7 @@ every forum and topic are the ones the forums keep.
 ```bash
 bash cmd-tools-bbpress-forums.sh myforums                    # the forums, their topics and replies, the forum role of each account
 bash cmd-tools-bbpress-forums.sh myforums --add-users        # the default accounts, each with its forum role
-bash cmd-tools-bbpress-forums.sh myforums --cancel-users     # delete them, and the topics and replies they wrote
+bash cmd-tools-bbpress-forums.sh myforums --cancel-users     # delete them; what they wrote stays, without an author
 bash cmd-tools-bbpress-forums.sh myforums --sample-content   # the sample forums and topics; what is there is kept
 bash cmd-tools-bbpress-forums.sh myforums --tidy             # take away what a stopped test run left
 ```
@@ -166,8 +166,10 @@ bash cmd-tools-add-users.sh myforums bbpress       # the core's tool, with the p
 bash cmd-tools-cancel-users.sh myforums bbpress
 ```
 
-Adding them again gives each its roles back. Cancelling deletes them with the topics and replies they
-wrote: add the sample content again afterwards (`cmd-tools-bbpress-forums.sh myforums --sample-content`).
+Adding them again gives each its roles back. Cancelling deletes the accounts only: the topics and
+replies they wrote stay, and the forums print "Anonymous" for their author. Once the accounts are
+added again, `cmd-tools-bbpress-forums.sh myforums --sample-content` gives each sample topic and reply
+its author back.
 
 ### Test a site with forums
 

@@ -112,6 +112,10 @@ test('the script that writes the forums uses the forums\' own functions, and cre
     assert.ok(src.includes(`${fn}(`), `${fn} writes it`);
   }
   assert.doesNotMatch(src, /wp_insert_user|wp_create_user|wp_delete_user/, 'accounts are the builder\'s, never the script\'s');
+  // An account that was deleted and made again gets the sample content it wrote back (#1).
+  assert.match(src, /function webship_own\( \$id, \$author \)/);
+  for (const back of ["return webship_own( $id, 'keymaster' );", 'return webship_own( $id, $author );', 'return webship_own( $reply->ID, $author );']) assert.ok(src.includes(back), `${back} gives the item its author back`);
+  assert.doesNotMatch(read('README.md') + read('scripts/args/arg-bbpress-forums.sh'), /and the topics and replies they wrote\b[.']/, 'cancelling does not delete what the accounts wrote');
   assert.doesNotMatch(src, /\$wpdb->(query|insert|update|delete)/, 'nothing is written past the forums\' functions');
   for (const mode of ['settings', 'roles', 'content', 'reset', 'status']) assert.ok(src.includes(`'${mode}' === $webship_mode`) || src.includes(`'${mode}' !== $webship_mode`), `the mode ${mode}`);
 });
