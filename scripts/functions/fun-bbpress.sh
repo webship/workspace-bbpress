@@ -211,7 +211,8 @@ function add_bbpress_users() {
   cd ${WORKSPACE_ROOT}/${doc_name};
 }
 
-# Delete the default accounts, and the topics and replies they wrote.
+# Delete the default accounts. The topics and replies they wrote stay, without an author: forum-site.php gives
+# each sample topic and reply its author back once the accounts are on the site again (--sample-content, --tidy).
 function cancel_bbpress_users() {
   bbpress_enter_project || return 1 ;
   local user user_name ;

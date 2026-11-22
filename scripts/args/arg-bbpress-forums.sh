@@ -10,11 +10,11 @@ parser.add_argument('-a', '--add-users',
 parser.add_argument('-c', '--cancel-users',
                     action='store_true',
                     default=False,
-                    help='Delete the default accounts, and the topics and replies they wrote.')
+                    help='Delete the default accounts. The topics and replies they wrote stay, without an author, until the accounts and the sample content are added again.')
 parser.add_argument('-s', '--sample-content',
                     action='store_true',
                     default=False,
-                    help='Add the forums and topics the test scenarios name. What is there already is kept.')
+                    help='Add the forums and topics the test scenarios name. What is there already is kept, and gets its author back when the account is on the site again.')
 parser.add_argument('-t', '--tidy',
                     action='store_true',
                     default=False,
