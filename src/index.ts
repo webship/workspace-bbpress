@@ -48,7 +48,7 @@ export function assistantContext(): string {
     '`bash cmd-bbpress-project.sh <name> --install --add-users --sample-content` from a sites folder (dev, test, sandboxes, demos):',
     'the WordPress plugin\'s builder makes the site, then the free bbPress plugin is added from the plugin directory and the forums are set up for testing',
     '(pretty addresses, no wait between two posts, no time limit on editing a post),',
-    'in a container like every other project, at https://<name>.ddev.site/forums/; `--sample-content` adds the forums and topics the step pack\'s features name,',
+    'in a container like every other project: on DDEV by default, at https://<name>.ddev.site/forums/, or with `--runtime docker|podman|kubernetes|lando|docksal` on that runtime, at the address the build prints; `--sample-content` adds the forums and topics the step pack\'s features name,',
     '`--add-users` the default accounts, one per forum role (administrator, keymaster, moderator, participant, spectator, blocked).',
     '`bash cmd-tools-bbpress-forums.sh <name>` says what the forums hold; with `--add-users`, `--cancel-users`, `--sample-content` or `--tidy` it changes them.',
     'WP-CLI is the WordPress plugin\'s tool: `bash cmd-tools-wordpress-cli.sh <name> --run "plugin list"`.',

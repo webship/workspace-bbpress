@@ -15,9 +15,17 @@
 # container. WP-CLI itself is the WordPress plugin's tool:
 #   bash cmd-tools-wordpress-cli.sh <site> --run "plugin list"
 #
-# A site with forums is a project of the type `wordpress`. The builder leaves .ddev/config.bbpress.yaml in
-# it: the claim of this plugin on the project, by which the core's tools take the test users of the forums
-# for it instead of the WordPress list. Four names are the ones the core's tools look for:
+# A site with forums is a project of the type `wordpress`. The builder leaves the claim of this plugin on the
+# project, by which the core's tools take the test users of the forums for it instead of the WordPress list:
+# .ddev/config.bbpress.yaml on DDEV, `platform: bbpress` in the x-webship block on another runtime.
+#
+# The runtimes: a site is built on DDEV, or with --runtime on Docker Compose, Podman, Kubernetes, Lando or
+# Docksal. The WordPress plugin's builder makes the site on that runtime, and the commands here are the same
+# on each: `ddev <verb>` is DDEV itself on a DDEV project, and on another runtime the core's layer
+# (fun-runtime.sh) gives the verb its meaning. What differs is behind bbpress_runtime: the address
+# (bbpress_url) and where the claim is.
+#
+# Four names are the ones the core's tools look for:
 #   set_bbpress_users          the default accounts        (cmd-tools-add-users.sh <project> bbpress)
 #   add_bbpress_users          create them with WP-CLI     (the same tool, and --add-users of the builder)
 #   cancel_bbpress_users       delete them                 (cmd-tools-cancel-users.sh <project> bbpress)
@@ -51,11 +59,28 @@ function set_bbpress_users() {
   user_administrator_forum_role='bbp_keymaster' ;
 }
 
-# Is this folder a site with forums? The builder leaves its claim in it; a WordPress project that got the
-# forums plugin another way has the plugin's folder, at its root or in its docroot.
+# The runtime of the project in this folder, or of a new build (--runtime, else the workspace's
+# setting, else DDEV). A core without the runtime layer has DDEV only.
+function bbpress_runtime() {
+  if declare -f runtime_of > /dev/null ; then runtime_of ; else echo 'ddev' ; fi
+}
+
+# The address of the site in this folder: https://<name>.ddev.site on DDEV, http://127.0.0.1:<port> on
+# Docker Compose, Podman and Lando, the node's address and a port on Kubernetes, http://<name>.docksal.site
+# on Docksal. Asked once the project is configured.
+function bbpress_url() {
+  if declare -f rt_url > /dev/null ; then rt_url ; else echo "https://${PROJECT_NAME}.ddev.site" ; fi
+}
+
+# Is this folder a site with forums? The builder leaves its claim in it (the file on DDEV, the x-webship
+# block on another runtime: the core's rt_is_platform reads both); a WordPress project that got the forums
+# plugin another way has the plugin's folder, at its root or in its docroot.
 function bbpress_is_project() {
   local project_path="$1" ;
   [ -f "${project_path}/.ddev/config.bbpress.yaml" ] && return 0 ;
+  if declare -f rt_is_platform > /dev/null ; then
+    rt_is_platform "${project_path}" bbpress && return 0 ;
+  fi
   [ -f "${project_path}/wp-content/plugins/bbpress/bbpress.php" ] && return 0 ;
   compgen -G "${project_path}/*/wp-content/plugins/bbpress/bbpress.php" > /dev/null ;
 }
@@ -109,7 +134,12 @@ function bbpress_forum_site() {
 # Build a site with forums from nothing: the WordPress plugin's builder makes the site, then bbPress is added.
 function bbpress_build() {
   trim_project_name ;
-  local base_url="https://${PROJECT_NAME}.ddev.site" ;
+  local base_url runtime ;
+  runtime="$(bbpress_runtime)" ;
+  if [ "${RUNTIME:-_none_}" != '_none_' ] && [ "${RUNTIME}" != "${runtime}" ] ; then
+    echo "--runtime ${RUNTIME} needs a Webship Workspace with the container runtimes (webship/workspace#694): update the workspace, or build on DDEV." ;
+    exit 1 ;
+  fi
   local bbpress_version="${VERSION:-${site_version:-latest}}" ;
   local add_users="${ADD_USERS}" launch="${LAUNCH}" ;
 
@@ -128,7 +158,14 @@ function bbpress_build() {
   ADD_USERS="${add_users}" ; LAUNCH="${launch}" ;
 
   cd "${WORKSPACE_ROOT}/${doc_name}/${PROJECT_NAME}" || exit 1 ;
-  bbpress_write_claim "${WORKSPACE_ROOT}/${doc_name}/${PROJECT_NAME}" || { echo "The plugin's claim on the project could not be written." ; exit 1 ; } ;
+  # The address is the runtime's to say, now the project is configured: never a written ddev.site.
+  base_url="$(bbpress_url)" ;
+  # The claim: a file of the container tool's on DDEV, the x-webship block on another runtime.
+  if [ "${runtime}" != 'ddev' ] ; then
+    rt_claim bbpress || { echo "The plugin's claim on the project could not be written." ; exit 1 ; } ;
+  else
+    bbpress_write_claim "${WORKSPACE_ROOT}/${doc_name}/${PROJECT_NAME}" || { echo "The plugin's claim on the project could not be written." ; exit 1 ; } ;
+  fi
 
   if [ "${INSTALL}" != 'yes' ] ; then
     # No site yet: bbPress goes into the plugins, to activate once WordPress is installed.

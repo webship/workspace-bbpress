@@ -41,9 +41,10 @@ bash cmd-bbpress-project.sh myforums --install --add-users --sample-content
 | `--locale <x>` | The language WordPress is downloaded in. |
 | `--php-version <x>` | The PHP of the project container. |
 | `--launch` | Opens the forums when they are ready. |
+| `--runtime <name>` | The container runtime: `ddev` (the default), `docker`, `podman`, `kubernetes`, `lando` or `docksal`. |
 
-The forums answer at `https://<name>.ddev.site/forums/`, the administration at `/wp-admin`, the mail
-catcher at `https://<name>.ddev.site:8026`. The WordPress plugin's builder makes the site (a project of
+On DDEV the forums answer at `https://<name>.ddev.site/forums/`, the administration at `/wp-admin`, the mail
+catcher at `https://<name>.ddev.site:8026`. With `--runtime docker`, `podman`, `kubernetes`, `lando` or `docksal` the site is built on that runtime instead, at the address the build prints (`http://127.0.0.1:<port>`, the node's address and a port, or `http://<name>.docksal.site`): never write a `ddev.site` address for such a site. Its mailbox is at the address `rt_mail_url` gives, and the same commands work on it. The WordPress plugin's builder makes the site (a project of
 the type `wordpress`, with the Node.js of the workspace, 24); the container tool writes the database
 settings, the builder writes none. The builder **deletes a project of the same name first**: a build is
 a clean slate, so never point it at a site somebody still needs. The name is a folder, a container
