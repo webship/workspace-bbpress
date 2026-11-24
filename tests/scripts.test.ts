@@ -259,3 +259,95 @@ test('the first feature names no platform in a step, and no password; it is not 
   assert.match(fs.readFileSync(FUNCTIONS, 'utf8'), /tests\/features\/forums\.feature/);
   assert.doesNotMatch(fs.readFileSync(FUNCTIONS, 'utf8'), /tests\/features\/site\.feature/);
 });
+
+// ---- The runtimes: DDEV as before, and Docker Compose, Podman, Kubernetes, Lando and Docksal through the core's layer ----
+
+const ADDRESSES: Record<string, string> = {
+  docker: 'http://127.0.0.1:41234', podman: 'http://127.0.0.1:41234', lando: 'http://127.0.0.1:41234',
+  kubernetes: 'http://172.18.0.2:30080', docksal: 'http://site1.docksal.site',
+};
+
+/**
+ * The builder in a throwaway workspace, with `ddev` replaced by a recorder, the WordPress plugin's builder by a
+ * stand-in that makes the folder (as `ddev config` does), and the core's layer by stand-ins: `layer` is the runtime
+ * it answers with (runtime_of, rt_url, rt_claim), or '' for a core that has no layer yet.
+ */
+function build(layer: string, env: Record<string, string> = {}) {
+  const p = project('none');
+  fs.rmSync(p.dir, { recursive: true });
+  const log = path.join(p.root, 'ddev.log');
+  const address = ADDRESSES[layer] || '';
+  const stand = [
+    'trim_project_name() { :; }',
+    `wordpress_build() { echo "wordpress_build RUNTIME=$RUNTIME" >> "$DDEV_LOG" ; mkdir -p "$WORKSPACE_ROOT/$doc_name/$PROJECT_NAME" ; [ "\${RUNTIME_ANSWER:-ddev}" == ddev ] && mkdir -p "$WORKSPACE_ROOT/$doc_name/$PROJECT_NAME/.ddev" && touch "$WORKSPACE_ROOT/$doc_name/$PROJECT_NAME/.ddev/config.yaml" ; return 0 ; }`,
+    layer ? `runtime_of() { echo "\${RUNTIME_ANSWER}" ; } ; rt_url() { [ "\${RUNTIME_ANSWER}" == ddev ] && echo "https://\${PROJECT_NAME}.ddev.site" || echo "${address}" ; } ; rt_claim() { echo "rt_claim $* in $(basename "$PWD")" >> "$DDEV_LOG" ; }` : '',
+    'bbpress_build',
+  ].join('\n');
+  const r = bash(stand, { WORKSPACE_ROOT: p.root, WORKSPACE_SCRIPTS: p.scripts, doc_name: 'dev', PROJECT_NAME: 'site1', DDEV_LOG: log,
+    account_name: 'webmaster', INSTALL: 'yes', ADD_USERS: 'no', SAMPLE_CONTENT: 'no', LAUNCH: 'no', VERSION: 'latest',
+    RUNTIME: '_none_', RUNTIME_ANSWER: layer || 'ddev', ...env });
+  const calls = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').filter((c) => /^(ddev|rt_claim|wordpress_build) /.test(c)) : [];
+  return { r, calls, dir: path.join(p.root, 'dev', 'site1') };
+}
+
+test('on DDEV the build is what it was: the same commands with the layer and without it, the claim in .ddev/', () => {
+  const without = build('');
+  const withLayer = build('ddev');
+  for (const b of [without, withLayer]) {
+    assert.strictEqual(b.r.status, 0, b.r.stderr + b.r.stdout);
+    assert.match(b.r.stdout, /Go to https:\/\/site1\.ddev\.site\/forums\/, and https:\/\/site1\.ddev\.site\/wp-admin as webmaster/);
+    assert.ok(fs.existsSync(path.join(b.dir, '.ddev', 'config.bbpress.yaml')), 'the claim of the plugin, in the container tool\'s folder');
+    assert.ok(!b.calls.some((c) => c.startsWith('rt_claim ')), 'nothing is claimed through the layer on DDEV');
+  }
+  assert.deepStrictEqual(withLayer.calls, without.calls);
+});
+
+test('on Docker Compose, Podman, Kubernetes, Lando and Docksal the plugin claims the site through the layer and prints the runtime\'s address', () => {
+  for (const runtime of Object.keys(ADDRESSES)) {
+    const address = ADDRESSES[runtime];
+    const b = build(runtime, { RUNTIME: runtime });
+    assert.strictEqual(b.r.status, 0, runtime + ': ' + b.r.stderr + b.r.stdout);
+    assert.strictEqual(b.calls[0], `wordpress_build RUNTIME=${runtime}`, `${runtime}: the WordPress builder builds on the runtime asked for`);
+    assert.strictEqual(b.calls[1], 'rt_claim bbpress in site1', `${runtime}: the claim, right after the site`);
+    assert.ok(!fs.existsSync(path.join(b.dir, '.ddev')), `${runtime}: nothing of DDEV's is written`);
+    assert.match(b.r.stdout, new RegExp(`Go to ${address.replace(/[.]/g, '\\.')}/forums/, and ${address.replace(/[.]/g, '\\.')}/wp-admin as webmaster`), runtime);
+    assert.doesNotMatch(b.r.stdout, /ddev\.site/, runtime);
+  }
+});
+
+test('--runtime on a workspace without the runtime layer is refused, never built on DDEV in silence', () => {
+  const b = build('', { RUNTIME: 'docker' });
+  assert.strictEqual(b.r.status, 1);
+  assert.match(b.r.stdout, /--runtime docker needs a Webship Workspace with the container runtimes \(webship\/workspace#694\)/);
+  assert.deepStrictEqual(b.calls, [], 'nothing is built');
+});
+
+test('the builder takes --runtime, with the runtimes of the core\'s own builders', () => {
+  const args = fs.readFileSync(path.join(PKG, 'scripts', 'args', 'arg-bbpress.sh'), 'utf8');
+  assert.match(args, /parser\.add_argument\('--runtime',\s*dest='RUNTIME',\s*default="_none_",\s*choices=\['ddev', 'docker', 'podman', 'kubernetes', 'lando', 'docksal'\]/);
+});
+
+test('a site with forums is known on every runtime: the claim in the x-webship block, through the core\'s layer', () => {
+  const p = project('none');
+  fs.rmSync(path.join(p.dir, '.ddev'), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, 'compose.yaml'), 'x-webship:\n  runtime: docker\n  type: wordpress\n  platform: bbpress\n');
+  const layer = 'rt_is_platform() { grep -qE "^  (type|platform): $2$" "$1/compose.yaml" 2>/dev/null ; } ; ';
+  assert.strictEqual(bash(`${layer} bbpress_is_project ${p.dir}`).status, 0, 'claimed: a site with forums');
+  fs.writeFileSync(path.join(p.dir, 'compose.yaml'), 'x-webship:\n  runtime: docker\n  type: wordpress\n');
+  assert.strictEqual(bash(`${layer} bbpress_is_project ${p.dir}`).status, 1, 'a plain WordPress site is not one');
+  assert.strictEqual(bash(`bbpress_is_project ${p.dir}`).status, 1, 'and without the layer, nothing claims it');
+});
+
+test('the feature of the runtimes drives a site the plugin claims, and names no platform in a step', () => {
+  const feature = fs.readFileSync(path.join(PKG, 'features', 'bbpress-runtimes.feature'), 'utf8');
+  const scenarios = feature.split(/\n(?=  @needs-runtime-)/).slice(1);
+  assert.strictEqual(scenarios.length, 6);
+  for (const s of scenarios) assert.match(s, /^  @needs-runtime-(docker|kubernetes) @needs-platform-bbpress\n  Scenario: /);
+  const steps = feature.split('\n').filter((l) => /^\s*(Given|When|Then|And|But) /.test(l));
+  for (const s of steps) assert.doesNotMatch(s, /bbpress|wordpress/i, s);
+  assert.doesNotMatch(feature, /ddev\.site|127\.0\.0\.1/);
+  const manifest = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')).workspacePlugin;
+  assert.ok(manifest.features.includes('features/bbpress-runtimes.feature'));
+  // The CI site has the sample content: the feature reads a forum of it.
+  assert.match(manifest.featuresSite, /^cmd-bbpress-project\.sh ci-bbpress( [A-Za-z0-9._=-]+)* --sample-content --runtime docker$/);
+});

@@ -4,7 +4,8 @@
 
 # Installed by the bbPress plugin (plugins.sh --install bbpress); __WORKSPACE__ is the workspace it was installed into.
 #
-# Build a site with forums in a container, at https://<name>.ddev.site: the WordPress plugin's builder makes
+# Build a site with forums in a container, on DDEV (the default) at https://<name>.ddev.site, or with
+# --runtime docker, podman, kubernetes, lando or docksal at the address the build prints: the WordPress plugin's builder makes
 # the site (the latest WordPress, or the one --wordpress-version names), then the free bbPress plugin is
 # added from the plugin directory. With --install the forums are set up for testing (pretty addresses, no
 # wait between two posts of an account, no time limit on editing one's own post); with --add-users the

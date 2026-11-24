@@ -88,8 +88,10 @@
       ]
     },
     "features": [
-      "features/bbpress.feature"
-    ]
+      "features/bbpress.feature",
+      "features/bbpress-runtimes.feature"
+    ],
+    "featuresSite": "cmd-bbpress-project.sh ci-bbpress --install --add-users --sample-content --runtime docker"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
