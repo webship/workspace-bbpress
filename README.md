@@ -79,6 +79,7 @@ Everything the builder runs for a site runs in the site's own container, through
 | `ai/prompts/bbpress-build-and-test.md`, `bbpress-moderation-round.md` | Two prompts: whole launch commands for a new session |
 | `src/index.ts` | `register(api)`: what the assistant is told about bbPress here |
 | `features/bbpress.feature` | Scenarios for the dashboard's own browser suite |
+| `features/bbpress-runtimes.feature` | The row, the test users and two pages of the forums of a site built on Docker Compose and on Kubernetes |
 
 The `workspacePlugin` block in `package.json` is the manifest the installer reads.
 
@@ -100,9 +101,10 @@ bash cmd-bbpress-project.sh myforums --install --add-users --sample-content
 | `--wordpress-version <x>` | The WordPress release (`latest` by default) |
 | `--locale <x>` | The language WordPress is downloaded in |
 | `--php-version <x>` | The PHP of the project container |
+| `--runtime <name>` | The container runtime to build on: `ddev` (the default), `docker`, `kubernetes`, `podman`, `lando` or `docksal`. See [Runtimes](#runtimes) |
 | `--launch` | Open the forums when they are ready |
 
-The forums answer at `https://myforums.ddev.site/forums/`, the administration at `/wp-admin`, the mail
+On DDEV the forums answer at `https://myforums.ddev.site/forums/`, the administration at `/wp-admin`, the mail
 catcher at `https://myforums.ddev.site:8026`. The WordPress plugin's builder makes the project (of the
 type `wordpress`, with the Node.js of the workspace, 24) and installs the site; the container tool
 writes the database settings, the builder writes none. A project of the same name is deleted first.
@@ -110,14 +112,67 @@ writes the database settings, the builder writes none. A project of the same nam
 Nothing paid and no account anywhere: the free plugin from the plugin directory, the theme WordPress
 installs with, and content written by the forums' own functions.
 
+
+### Runtimes
+
+```bash
+bash cmd-bbpress-project.sh myforums --install --add-users --sample-content                        # DDEV, the default
+bash cmd-bbpress-project.sh myforums --install --add-users --sample-content --runtime docker       # Docker Compose
+bash cmd-bbpress-project.sh myforums --install --add-users --sample-content --runtime kubernetes   # a Kubernetes cluster
+bash cmd-bbpress-project.sh myforums --install --add-users --sample-content --runtime lando        # Lando
+bash cmd-bbpress-project.sh myforums --install --add-users --sample-content --runtime docksal      # Docksal
+```
+
+Without `--runtime` a build takes `container.runtime` of the workspace's `settings.yml`, then DDEV.
+It needs a Webship Workspace with the container runtimes
+([webship/workspace#694](https://github.com/webship/workspace/issues/694)); on an older one the
+builder refuses `--runtime` and builds on DDEV only. Lando and Docksal need a Workspace whose runtime
+layer has them ([webship/workspace#729](https://github.com/webship/workspace/issues/729),
+[#730](https://github.com/webship/workspace/issues/730)).
+
+| | DDEV | Docker Compose | Kubernetes | Podman | Lando | Docksal |
+| --- | --- | --- | --- | --- | --- | --- |
+| Build with `--install --add-users --sample-content` | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The forums and the administration; a login as the workspace account and the forum roles (a Participant refused the forums' screens) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| `cmd-tools-bbpress-forums.sh` (what the forums hold), and WP-CLI (`cmd-tools-wordpress-cli.sh`) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Test users, cancelled and added | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Mail caught by Mailpit (WordPress's lost-password mail) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The testing setup and the first features | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The step pack's examples, with the sample content (73 scenarios) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Export and import the database | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The row in the dashboard, and remove | Yes | Yes | Yes | Not yet run | Yes | Yes |
+
+"Yes" means it was run on a real site of that runtime. Podman runs the same code as Docker Compose
+and was not run yet.
+
+| Runtime | The site's address | What the project carries |
+| --- | --- | --- |
+| DDEV | `https://myforums.ddev.site` | `.ddev/config.yaml`, and the plugin's claim `.ddev/config.bbpress.yaml` |
+| Docker Compose | `http://127.0.0.1:<port>`, printed by the build | `compose.yaml`, `.webship/runtime/Dockerfile` |
+| Kubernetes | `http://<node address>:<port>`, printed by the build | The same, and `k8s/` (the namespace `ws-myforums`) |
+| Lando | `http://127.0.0.1:<port>`, printed by the build | `.lando.yml` (Lando's proxy stays off) |
+| Docksal | `http://myforums.docksal.site`, on Docksal's own proxy | `.docksal/docksal.env`, `.docksal/docksal.yml` |
+
+What differs on Docker Compose, Kubernetes, Lando and Docksal:
+
+- **The claim** is `platform: bbpress` in the `x-webship` block (the core's `rt_claim`): no `.ddev/` folder is written there, and the row's Tests menu offers the forums' list by it.
+- **The site** is the WordPress plugin's, built on the same runtime: its `wp-config.php` with the stack's database (`db`/`db`/`db` on the host `db`), the address it is asked on, and the `.htaccess` Apache needs.
+- **Cancelling the test users** deletes what they wrote, as on DDEV (WordPress's user delete): `cmd-tools-bbpress-forums.sh <site> --sample-content` puts the sample content back, and keeps what is there.
+- **HTTPS and a host name** are DDEV's: a runtime's address is plain HTTP.
+
+The same commands work on every runtime: `cmd-tools-bbpress-forums.sh`, `cmd-tools-add-users.sh`,
+`cmd-tools-testing.sh`. The pattern is the Workspace's
+[`core/docs/plugins-on-runtimes.md`](https://github.com/webship/workspace/blob/1.0.x/core/docs/plugins-on-runtimes.md).
+
 ### The plugin's claim on the project
 
-A site with forums is a project of the type `wordpress`, which is the WordPress plugin's. The builder
+A site with forums is a project of the type `wordpress`, which is the WordPress plugin's. On DDEV the builder
 leaves `.ddev/config.bbpress.yaml` in the project: a config overlay of the container tool with one key
 (`web_environment: WEBSHIP_WORKSPACE_PLATFORM=bbpress`, in the web container's environment from its
 next start; nothing of the site reads it). The file's name is what the workspace reads: a project that
 carries `config.<plugin>.yaml` takes the test users of that plugin, so the row's Tests menu offers the
-forums' list (`bbpress`) instead of the WordPress one. A WordPress project that got the forums plugin
+forums' list (`bbpress`) instead of the WordPress one. On another runtime the claim is `platform: bbpress`
+in the `x-webship` block (see [Runtimes](#runtimes)). A WordPress project that got the forums plugin
 another way has no claim: the plugin's tools still know it by the plugin's folder in its plugins.
 
 ### The forums' tool
@@ -236,10 +291,11 @@ and flag against the plugin's own, the WordPress plugin's and the workspace's.
 
 The builder and the tools call the container tool with plain verbs only (`ddev wp …`, `ddev exec`,
 `ddev start`, `ddev launch`): no container is reached by its name, and the tool's own project file is
-not read. Two things are DDEV's by name: the claim file lives in the tool's folder
+not read. On DDEV two things are DDEV's by name: the claim file lives in the tool's folder
 (`.ddev/config.bbpress.yaml`, the place the workspace looks for it), and the addresses the builder
 prints (`https://<name>.ddev.site`, the mail catcher at port 8026) are the ones DDEV's router gives a
-project.
+project. On another runtime the claim is in the `x-webship` block and the addresses are the runtime's
+(`rt_url`, `rt_mail_url`).
 
 ## Develop it
 
